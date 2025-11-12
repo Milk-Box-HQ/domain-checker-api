@@ -283,6 +283,144 @@ app.post('/check-batch', async (req, res) => {
   }
 });
 
+// ============================================
+// AIRTABLE LOGGING ENDPOINT
+// ============================================
+
+/**
+ * POST /log-usage - Log domain generator usage to Airtable
+ *
+ * Request Body:
+ * {
+ *   "companyName": "string",
+ *   "mainDomain": "string",
+ *   "generatedCount": number
+ * }
+ *
+ * Response:
+ * {
+ *   "success": true,
+ *   "message": "Usage logged successfully",
+ *   "recordId": "recXXXXXXXXXXXXXX"
+ * }
+ */
+app.post('/log-usage', async (req, res) => {
+  try {
+    // Airtable configuration from environment variables
+    const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
+    const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
+    const AIRTABLE_TABLE_NAME = process.env.AIRTABLE_TABLE_NAME || 'Domain Generator Logs';
+
+    // Validate environment configuration
+    if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
+      console.error('[Airtable] Missing configuration');
+      return res.status(500).json({
+        success: false,
+        error: 'Server configuration error',
+        message: 'Airtable credentials not configured on server'
+      });
+    }
+
+    // Extract and validate request data
+    const { companyName, mainDomain, generatedCount } = req.body;
+
+    if (!companyName || !mainDomain || generatedCount === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields',
+        message: 'companyName, mainDomain, and generatedCount are required',
+        received: { companyName, mainDomain, generatedCount }
+      });
+    }
+
+    // Validate data types
+    if (typeof companyName !== 'string' || typeof mainDomain !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid data types',
+        message: 'companyName and mainDomain must be strings'
+      });
+    }
+
+    const parsedCount = parseInt(generatedCount);
+    if (isNaN(parsedCount) || parsedCount < 1) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid generated count',
+        message: 'generatedCount must be a positive number'
+      });
+    }
+
+    // Prepare Airtable API request
+    const airtableUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(AIRTABLE_TABLE_NAME)}`;
+
+    const record = {
+      fields: {
+        'Company Name': companyName,
+        'Main Domain': mainDomain,
+        'Generated Count': parsedCount,
+        'Timestamp': new Date().toISOString()
+      }
+    };
+
+    console.log(`[Airtable] Logging usage: ${companyName} - ${mainDomain} (${parsedCount} domains)`);
+
+    // Send request to Airtable
+    const airtableResponse = await axios.post(airtableUrl, record, {
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      timeout: 10000,
+      validateStatus: (status) => status >= 200 && status < 500
+    });
+
+    // Handle Airtable errors
+    if (airtableResponse.status >= 400) {
+      console.error('[Airtable] API error:', airtableResponse.status, airtableResponse.data);
+
+      // Map common Airtable errors to user-friendly messages
+      let errorMessage = 'Failed to log usage to Airtable';
+      if (airtableResponse.status === 401) {
+        errorMessage = 'Invalid Airtable API key';
+      } else if (airtableResponse.status === 404) {
+        errorMessage = 'Airtable base or table not found';
+      } else if (airtableResponse.status === 422) {
+        errorMessage = 'Invalid field configuration in Airtable';
+      }
+
+      return res.status(airtableResponse.status).json({
+        success: false,
+        error: 'Airtable API error',
+        message: errorMessage,
+        status: airtableResponse.status
+      });
+    }
+
+    // Parse successful response
+    const airtableData = airtableResponse.data;
+
+    console.log(`[Airtable] ✓ Successfully logged: Record ID ${airtableData.id}`);
+
+    // Return success response
+    res.status(200).json({
+      success: true,
+      message: 'Usage logged successfully',
+      recordId: airtableData.id,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    // Handle unexpected errors
+    console.error('[Airtable] Unexpected error:', error.message);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+      message: error.message
+    });
+  }
+});
+
 /**
  * GET /health - API health check for Render monitoring
  */
