@@ -489,6 +489,7 @@ app.get('/', (req, res) => {
     endpoints: {
       'GET /check': 'Check single domain (add ?domain=example.com)',
       'POST /check-batch': 'Check multiple domains (send {domains: [...]})',
+      'POST /log-usage': 'Log domain generator usage to Airtable',
       'GET /health': 'Basic health check',
       'GET /health/detailed': 'Detailed health check (tests API)'
     },
