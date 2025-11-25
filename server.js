@@ -294,6 +294,7 @@ app.post('/check-batch', async (req, res) => {
  * {
  *   "companyName": "string",
  *   "mainDomain": "string",
+ *   "email": "string",
  *   "generatedCount": number
  * }
  *
@@ -322,19 +323,19 @@ app.post('/log-usage', async (req, res) => {
     }
 
     // Extract and validate request data
-    const { companyName, mainDomain, generatedCount } = req.body;
+    const { companyName, mainDomain, email, generatedCount } = req.body;
 
-    if (!companyName || !mainDomain || generatedCount === undefined) {
+    if (!companyName || !mainDomain || !email || generatedCount === undefined) {
       return res.status(400).json({
         success: false,
         error: 'Missing required fields',
-        message: 'companyName, mainDomain, and generatedCount are required',
+        message: 'companyName, mainDomain, email, and generatedCount are required',
         received: { companyName, mainDomain, generatedCount }
       });
     }
 
     // Validate data types
-    if (typeof companyName !== 'string' || typeof mainDomain !== 'string') {
+    if (typeof companyName !== 'string' || typeof mainDomain !== 'string' || typeof email !== 'string') {
       return res.status(400).json({
         success: false,
         error: 'Invalid data types',
@@ -359,11 +360,12 @@ app.post('/log-usage', async (req, res) => {
         'Company Name': companyName,
         'Main Domain': mainDomain,
         'Generated Count': parsedCount,
+        'Email': email,
         'Timestamp': new Date().toISOString()
       }
     };
 
-    console.log(`[Airtable] Logging usage: ${companyName} - ${mainDomain} (${parsedCount} domains)`);
+    console.log(`[Airtable] Logging usage: ${companyName} - ${mainDomain} - ${email} (${parsedCount} domains)`);
 
     // Send request to Airtable
     const airtableResponse = await axios.post(airtableUrl, record, {
