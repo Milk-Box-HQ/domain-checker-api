@@ -327,40 +327,52 @@ app.post('/log-usage', async (req, res) => {
       email,
       generatedCount,
       mainDomain,
-      domain,
-      domainOrIp,
-      target,
-      rawDomain,
     } = req.body;
 
-    const resolvedMainDomain = [mainDomain, domain, domainOrIp, target, rawDomain]
-      .map((value) => (typeof value === 'string' ? value.trim() : ''))
-      .find((value) => value.length > 0) || '';
+    const resolvedMainDomain = typeof mainDomain === 'string' ? mainDomain.trim() : '';
+    const resolvedCompanyName = typeof companyName === 'string' ? companyName.trim() : '';
+    const resolvedEmail = typeof email === 'string' ? email.trim() : '';
 
-    if (!companyName || !email || generatedCount === undefined) {
+    if (generatedCount === undefined) {
       return res.status(400).json({
         success: false,
         error: 'Missing required fields',
-        message: 'companyName, email, and generatedCount are required',
-        received: { companyName, generatedCount, mainDomain: resolvedMainDomain }
+        message: 'generatedCount is required',
+        received: { companyName: resolvedCompanyName, email: resolvedEmail, generatedCount, mainDomain: resolvedMainDomain }
       });
     }
 
     // Validate data types
-    if (typeof companyName !== 'string' || typeof email !== 'string') {
+    if (companyName !== undefined && typeof companyName !== 'string') {
       return res.status(400).json({
         success: false,
         error: 'Invalid data types',
         message: 'companyName must be string'
       });
     }
+    if (email !== undefined && typeof email !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid data types',
+        message: 'email must be string'
+      });
+    }
 
     const parsedCount = parseInt(generatedCount);
-    if (isNaN(parsedCount) || parsedCount < 1) {
+    if (isNaN(parsedCount) || parsedCount < 0) {
       return res.status(400).json({
         success: false,
         error: 'Invalid generated count',
-        message: 'generatedCount must be a positive number'
+        message: 'generatedCount must be zero or a positive number'
+      });
+    }
+
+    if (!resolvedMainDomain) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields',
+        message: 'mainDomain is required',
+        received: { companyName: resolvedCompanyName, email: resolvedEmail, generatedCount, mainDomain: resolvedMainDomain }
       });
     }
 
@@ -369,15 +381,15 @@ app.post('/log-usage', async (req, res) => {
 
     const record = {
       fields: {
-        'Company Name': companyName,
+        'Company Name': resolvedCompanyName,
         'Generated Count': parsedCount,
-        'Email': email,
+        'Email': resolvedEmail,
         'Main Domain': resolvedMainDomain,
-        'Timestamp': new Date().toISOString()
+        'Timestamp': typeof req.body.timestamp === 'string' && req.body.timestamp.trim() ? req.body.timestamp.trim() : new Date().toISOString()
       }
     };
 
-    console.log(`[Airtable] Logging usage: ${companyName} - ${email} (${parsedCount} domains)`);
+    console.log(`[Airtable] Logging usage: ${resolvedCompanyName || 'comparison'} - ${resolvedEmail || 'n/a'} (${parsedCount} domains)`);
 
     // Send request to Airtable
     const airtableResponse = await axios.post(airtableUrl, record, {
