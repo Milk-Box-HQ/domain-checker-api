@@ -322,14 +322,27 @@ app.post('/log-usage', async (req, res) => {
     }
 
     // Extract and validate request data
-    const { companyName, email, generatedCount } = req.body;
+    const {
+      companyName,
+      email,
+      generatedCount,
+      mainDomain,
+      domain,
+      domainOrIp,
+      target,
+      rawDomain,
+    } = req.body;
+
+    const resolvedMainDomain = [mainDomain, domain, domainOrIp, target, rawDomain]
+      .map((value) => (typeof value === 'string' ? value.trim() : ''))
+      .find((value) => value.length > 0) || '';
 
     if (!companyName || !email || generatedCount === undefined) {
       return res.status(400).json({
         success: false,
         error: 'Missing required fields',
         message: 'companyName, email, and generatedCount are required',
-        received: { companyName, generatedCount }
+        received: { companyName, generatedCount, mainDomain: resolvedMainDomain }
       });
     }
 
@@ -359,6 +372,7 @@ app.post('/log-usage', async (req, res) => {
         'Company Name': companyName,
         'Generated Count': parsedCount,
         'Email': email,
+        'Main Domain': resolvedMainDomain,
         'Timestamp': new Date().toISOString()
       }
     };
